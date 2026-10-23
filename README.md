@@ -1,12 +1,12 @@
-# Melton6-EN: README only. The addon files are not published yet
+# Melton6 (English edition)
 
-Melton6 is a Windower 4 addon for Final Fantasy XI. With one macro press it runs a Scholar's six-step Immanence skillchain, then Enlightenment and Ebullience, then Kaustra as a magic burst: the "6-chain Kaustra" used against Bhaba in Sheol Gaol.
+Melton6 is a Windower 4 addon for Final Fantasy XI. With one macro press it runs a Scholar's six-step Immanence skillchain, then Enlightenment and Ebullience, then Kaustra as a magic burst: the "6-chain Kaustra" used against a Sheol Gaol boss.
 
-> **Status.** This repository holds the English README only. An English-client build of the addon is planned and would be added here, but it does not exist yet, so the installation steps below do not apply yet. The existing addon at [hikaruoshino/Melton6](https://github.com/hikaruoshino/Melton6) is for the Japanese client only. It sends Japanese spell names, so do not use it on the English client; I have not tested it there.
+> **Status.** This is the English-client edition of Melton6. It uses the English spell and ability names and the English text in chat. The logic is the same as the Japanese edition ([hikaruoshino/Melton6](https://github.com/hikaruoshino/Melton6)), which I checked in a real fight on the Japanese client. **The English edition has not been tried in game yet.** I have only checked it in a simulated Windower environment (51 checks: the order of the commands it sends, the English names, stopping when something fails). Please try it first on an enemy where a failure costs little, and tell me if something does not work. The Japanese edition sends Japanese spell names, so do not use it on the English client.
 
 ## Notice
 
-After a single macro press, Melton6 sends 17 job ability and spell commands for you (more if an ability misfires and is retried).
+After a single macro press, Melton6 sends up to 17 job ability and spell commands for you (fewer if Tabula Rasa or Dark Arts is already active, more if an ability misfires and is retried).
 
 - One press runs the sequence once. It does not loop or keep fighting for you.
 - If anything goes wrong (the chain does not happen, a cast is interrupted), it stops where it is. It never keeps sending commands after a failure.
@@ -65,10 +65,10 @@ Gear tips:
 - **Keep the weapon type the same.** If the weapon type changes between your fast cast, Immanence and burst sets, your appearance flickers at every swap. Use the same type everywhere (for example, a club and a shield).
 - **Immanence spells.** They only set up the chain, so keep the damage low, and use Subtle Blow gear so you do not feed the enemy TP. For reference, see [this Scholar magic burst gear article on spoiler.jp](https://www.spoiler.jp/blog/2026/03/11schmb/) (in Japanese).
 
-## Installation (once the files are added here)
+## Installation
 
 1. Download the repository (Code > Download ZIP) and unzip it. GitHub names the folder `Melton6-EN-main`; rename it to `Melton6`. The addon will not load under another name.
-2. Put the `Melton6` folder in `Windower4/addons/`.
+2. Put the `Melton6` folder (with `Melton6.lua` in it) in `Windower4/addons/`. If you use the Japanese edition too, use only one of them: they share the folder name and the `data/` settings.
 3. In game, run `//lua load Melton6`.
 4. Put this single line in a macro:
 
@@ -84,16 +84,20 @@ The only requirement is Windower 4; the libraries it uses (`config` and `resourc
 
 | Command | What it does |
 | :--- | :--- |
-| `//m6 go` | Start the 6-chain Kaustra |
+| `//m6 go` | Start the 6-step skillchain into Kaustra |
 | `//m6 stop` | Stop partway |
 | `//m6 check` | Check whether it can start, and run nothing |
 | `//m6 status` | Show the settings |
 | `//m6 set post <sec>` | Wait from a spell landing to the next ability (default 3.0). Adjust it if the chain does not form |
 | `//m6 set gap <sec>` | Wait after an ability (default 1.0) |
-| `//m6 set boosttimeout <sec>` | How long to wait for Enlightenment and Ebullience to fire (default 1.5; other abilities use 2.5) |
+| `//m6 set boosttimeout <sec>` | How long to wait for Enlightenment and Ebullience to fire (default 1.5) |
+| `//m6 set jatimeout <sec>` | How long to wait for any other ability to fire (default 2.5) |
+| `//m6 set retries <n>` | How many times to use an ability again if it did not fire (default 1; Enlightenment and Ebullience are never retried) |
+| `//m6 set casttimeout <sec>` | How long to wait for a cast to start (default 2.5) |
+| `//m6 set landtimeout <sec>` | How long to wait for a spell to land after the cast starts (default 12.0) |
 | `//m6 tabula` | Whether to use Tabula Rasa automatically when it has worn off (ON / OFF) |
 
-The Japanese repository's `COMMANDS.txt` has more details.
+Settings are saved in `data/settings.xml`.
 
 ## Notes
 
@@ -107,4 +111,5 @@ MIT License.
 
 ## Changelog
 
+- **English edition (2026-10-23).** The same logic as v1.0.0 with English spell and ability names (read from Windower's resources), English chat text and English skillchain names. Not tried in game yet.
 - **v1.0.0 (2026-10-09, Japanese edition).** First release: the six-step Immanence chain, Enlightenment, Ebullience and the Kaustra burst on one macro press. It advances by checking execution, landing, skillchain and burst packets, and stops on failure. If either Enlightenment or Ebullience fires, it carries on to Kaustra.
