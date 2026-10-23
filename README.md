@@ -1,6 +1,6 @@
 # Melton6 (English edition)
 
-Melton6 is a Windower 4 addon for Final Fantasy XI. With one macro press it runs a Scholar's six-step Immanence skillchain, then Enlightenment and Ebullience, then Kaustra as a magic burst: the "6-chain Kaustra" used against a Sheol Gaol boss.
+Melton6 is a Windower 4 addon for Final Fantasy XI. With one macro press it runs a Scholar's six-step Immanence skillchain, then Enlightenment and Ebullience, then Kaustra as a magic burst: the "6-chain Kaustra" used against Bumba in Sheol Gaol.
 
 > **Status.** This is the English-client edition of Melton6. It uses the English spell and ability names and the English text in chat. The logic is the same as the Japanese edition ([hikaruoshino/Melton6](https://github.com/hikaruoshino/Melton6)), which I checked in a real fight on the Japanese client. **The English edition has not been tried in game yet.** I have only checked it in a simulated Windower environment (51 checks: the order of the commands it sends, the English names, stopping when something fails). Please try it first on an enemy where a failure costs little, and tell me if something does not work. The Japanese edition sends Japanese spell names, so do not use it on the English client.
 
