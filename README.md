@@ -57,7 +57,7 @@ Without GearSwap the addon still runs, but you will not swap into fast cast gear
 
 I use the Scholar files (`SCH.lua`, `SCH_gear.lua`) from [greeds.net's GearSwap code list](https://greeds.net/gearswap-code-list/) as my base, and I have checked Melton6 with them. Rewrite `SCH_gear.lua` for your own gear. The files and layout are described on greeds.net, so follow that page for the latest. Melton6 is a personal project and has no connection to greeds.net; ask them about their code.
 
-My own modified Scholar GearSwap (`SCH.lua`, `SCH_gear.lua`, `weather_obi.lua`), based on the greeds.net version, is at [hikaruoshino/SCH-GearSwap](https://github.com/hikaruoshino/SCH-GearSwap). Its gear is matched to my inventory, so rewrite it before you use it.
+My own modified Scholar GearSwap (`SCH.lua`, `SCH_gear.lua`, `weather_obi.lua`), based on the greeds.net version, has an English edition at [hikaruoshino/SCH-GearSwap-EN](https://github.com/hikaruoshino/SCH-GearSwap-EN) (the Japanese-client edition is [hikaruoshino/SCH-GearSwap](https://github.com/hikaruoshino/SCH-GearSwap)). Its gear is matched to my inventory, so rewrite it before you use it.
 
 Gear tips:
 
