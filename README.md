@@ -113,3 +113,7 @@ MIT License.
 
 - **English edition (2026-10-23).** The same logic as v1.0.0 with English spell and ability names (read from Windower's resources), English chat text and English skillchain names. Not tried in game yet.
 - **v1.0.0 (2026-10-09, Japanese edition).** First release: the six-step Immanence chain, Enlightenment, Ebullience and the Kaustra burst on one macro press. It advances by checking execution, landing, skillchain and burst packets, and stops on failure. If either Enlightenment or Ebullience fires, it carries on to Kaustra.
+
+## Feedback
+
+A one-line "it works" is welcome too. With a GitHub account you can post from [Issues](../../issues/new/choose).
