@@ -88,16 +88,16 @@ The only requirement is Windower 4; the libraries it uses (`config` and `resourc
 | `//m6 stop` | Stop partway |
 | `//m6 check` | Check whether it can start, and run nothing |
 | `//m6 status` | Show the settings |
-| `//m6 set post <sec>` | Wait from a spell landing to the next ability (default 3.0). Adjust it if the chain does not form |
-| `//m6 set gap <sec>` | Wait after an ability (default 1.0) |
-| `//m6 set boosttimeout <sec>` | How long to wait for Enlightenment and Ebullience to fire (default 1.5) |
-| `//m6 set jatimeout <sec>` | How long to wait for any other ability to fire (default 2.5) |
-| `//m6 set retries <n>` | How many times to use an ability again if it did not fire (default 1; Enlightenment and Ebullience are never retried) |
-| `//m6 set casttimeout <sec>` | How long to wait for a cast to start (default 2.5) |
-| `//m6 set landtimeout <sec>` | How long to wait for a spell to land after the cast starts (default 12.0) |
+| `//m6 set post <sec>` | Wait from a spell landing to the next ability (default 3.0, range 0-10). Adjust it if the chain does not form |
+| `//m6 set gap <sec>` | Wait after an ability (default 1.0, range 0.5-5) |
+| `//m6 set boosttimeout <sec>` | How long to wait for Enlightenment and Ebullience to fire (default 1.5, range 0.5-5) |
+| `//m6 set jatimeout <sec>` | How long to wait for any other ability to fire (default 2.5, range 0.5-10) |
+| `//m6 set retries <n>` | How many times to use an ability again if it did not fire (default 1, range 0-2; Enlightenment and Ebullience are never retried) |
+| `//m6 set casttimeout <sec>` | How long to wait for a cast to start (default 2.5, range 1-10) |
+| `//m6 set landtimeout <sec>` | How long to wait for a spell to land after the cast starts (default 12.0, range 3-30) |
 | `//m6 tabula` | Whether to use Tabula Rasa automatically when it has worn off (ON / OFF) |
 
-Settings are saved in `data/settings.xml`.
+Settings are saved in `data/settings.xml`. Values outside the range are pulled back into it, with a message; this also applies to values written into `data/settings.xml` by hand (since 1.0.1).
 
 ## Notes
 
@@ -111,6 +111,7 @@ MIT License.
 
 ## Changelog
 
+- **v1.0.1 (2026-10-28).** Settings now have ranges (retries 0-2, waits and timeouts as listed above). Out-of-range values such as `//m6 set retries 50`, zero or negative numbers could make it resend an ability many times or send inputs back to back. The pre-start check now covers the Aero and Stone recasts too, so it won't stop at the second step and waste Tabula Rasa. The result message (burst or no burst) now names the target. Tested in game on the Japanese client.
 - **English edition (2026-10-23).** The same logic as v1.0.0 with English spell and ability names (read from Windower's resources), English chat text and English skillchain names. Not tried in game yet.
 - **v1.0.0 (2026-10-09, Japanese edition).** First release: the six-step Immanence chain, Enlightenment, Ebullience and the Kaustra burst on one macro press. It advances by checking execution, landing, skillchain and burst packets, and stops on failure. If either Enlightenment or Ebullience fires, it carries on to Kaustra.
 
