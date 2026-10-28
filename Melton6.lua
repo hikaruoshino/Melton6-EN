@@ -7,18 +7,22 @@
 --   Tabula Rasa -> Dark Arts
 --   -> Immanence Aero (Detonation) -> Immanence Stone (Scission) = Scission -> Immanence Aero = Detonation
 --   -> Immanence Geohelix = Scission -> Immanence Anemohelix = Detonation -> Immanence Noctohelix (Compression) = Gravitation
---   -> Enlightenment -> Ebullience -> Kaustra (Dark on Gravitation = magic burst)
+--   -> Ebullience -> Kaustra (Dark on Gravitation = magic burst)
 --
 -- How it advances: it does not use fixed waits. It confirms each action from the action packets before going on.
 --   Abilities: confirm the execution packet (category 6), wait ja_gap_sec (1 s), then go on.
---              Enlightenment -> Ebullience fails if they are not 1 s apart (confirmed in game by the author).
---              Enlightenment and Ebullience can fail because of lag, so if either one ran it goes on to Kaustra
---              (if both failed it stops before Kaustra). It does not retry them.
+--              Ebullience is not retried (there is no time left in the burst window); if it does not go off, it stops before Kaustra.
 --   Spells:    confirm the start of casting (category 8) and the landing (category 4). From the 2nd step on it also confirms
 --              that the intended skillchain happened (added-effect message), and waits post_land_sec after landing.
+--              After the final Gravitation it waits post_final_sec (3 s) before Ebullience. For about 2.5-3.5 s after a spell
+--              lands, abilities cannot be used (at 0.5 s the game refused the ability).
+--   Burst window: each step of a skillchain shortens its window by 1 s (10 - steps), and closing with a helix under
+--              Immanence adds 2 s. Gravitation here is the 5th skillchain: 10 - 5 + 2 = 7 s. Up to 1.0.1 it used
+--              Enlightenment -> Ebullience -> Kaustra, which landed 7.2-7.5 s after Gravitation and missed the burst.
+--              Enlightenment is dropped so Kaustra lands at about 5.7 s (in-game logs).
 --   On any failure (cast interrupted, no skillchain, timeout, target changed, zone change, ...) it stops on the spot.
 --
--- Note: this is an auto-cast addon. One macro press sends the ability and spell inputs (up to 17) automatically.
+-- Note: this is an auto-cast addon. One macro press sends the ability and spell inputs (up to 16) automatically.
 --   One press runs it once; it never repeats. If anything fails it stops where it is.
 --   Using external tools is not permitted by the FFXI Terms of Service; use it at your own risk.
 --   Do not use it unattended, and do not modify it for automatic combat or repeated casting.
@@ -28,7 +32,7 @@
 
 _addon.name     = "Melton6"
 _addon.author   = "hikaruoshino"
-_addon.version  = "1.0.1"
+_addon.version  = "1.0.2"
 _addon.commands = {"m6", "melton6"}
 
 local config = require("config")
@@ -39,13 +43,13 @@ local res    = require("resources")
 -- -----------------------------------------------------------------------------
 local defaults = {
     post_land_sec          = 3.0,   -- seconds from a spell landing to the next ability
+    post_final_sec         = 3.0,   -- seconds from the final Gravitation landing to Ebullience (until the post-cast lock ends)
     ja_gap_sec             = 1.0,   -- seconds from an ability being used to the next action (like <wait 1>)
     ja_timeout_sec         = 2.5,   -- seconds to wait for an ability to be confirmed after using it
-    boost_timeout_sec      = 1.5,   -- the same wait for Enlightenment and Ebullience only (kept short to make the burst window)
+    boost_timeout_sec      = 1.5,   -- the same wait for Ebullience only (kept short to make the burst window)
     ja_retries             = 1,     -- how many times to use an ability again if it was not executed
     cast_start_timeout_sec = 2.5,   -- seconds to wait for the start of casting after using a spell
     land_timeout_sec       = 12.0,  -- seconds to wait for the landing after the start of casting
-    mb_window_sec          = 10.0,  -- seconds the burst window lasts from the Noctohelix landing (8 + 2 s when a helix closes the chain)
     use_tabula_rasa        = true,  -- use Tabula Rasa automatically when it is off (stop if false)
 }
 local settings = config.load(defaults)
@@ -53,9 +57,18 @@ local settings = config.load(defaults)
 -- Allowed range (min, max) for each setting. Out-of-range values (0, negatives, huge numbers) could make the addon
 -- spam inputs or never stop, so values are clamped here, including ones written into settings.xml by hand
 local LIMITS = {
-    post_land_sec = {0, 10}, ja_gap_sec = {0.5, 5}, ja_timeout_sec = {0.5, 10}, boost_timeout_sec = {0.5, 5},
-    ja_retries = {0, 2}, cast_start_timeout_sec = {1, 10}, land_timeout_sec = {3, 30}, mb_window_sec = {5, 15},
+    post_land_sec = {0, 10}, post_final_sec = {0, 5}, ja_gap_sec = {0.5, 5}, ja_timeout_sec = {0.5, 10}, boost_timeout_sec = {0.5, 5},
+    ja_retries = {0, 2}, cast_start_timeout_sec = {1, 10}, land_timeout_sec = {3, 30},
 }
+
+-- Burst window in seconds: the skillchain window (10 - steps, at least 4 s; the same values OmniChain and ChainGuide use)
+-- plus 2 s for closing with a helix under Immanence.
+-- chain_count is the spell's place in the chain (6 for the 6th spell); the skillchain step is one less
+-- (the Gravitation from the 6th spell is the 5th skillchain).
+local SC_WINDOW_BASE_SEC, SC_WINDOW_MIN_SEC, IMMANENCE_BONUS_SEC = 10.0, 4.0, 2.0
+local function mb_window_sec(chain_count)
+    return math.max(SC_WINDOW_MIN_SEC, SC_WINDOW_BASE_SEC - (chain_count - 1)) + IMMANENCE_BONUS_SEC
+end
 local function clamp_setting(key, value)
     local lim = LIMITS[key]
     local n = tonumber(value)
@@ -69,10 +82,10 @@ for key in pairs(LIMITS) do settings[key] = clamp_setting(key, settings[key]) en
 -- -----------------------------------------------------------------------------
 -- Constants (the numbers are Windower res values)
 -- -----------------------------------------------------------------------------
-local JA = {TABULA_RASA = 210, DARK_ARTS = 212, EBULLIENCE = 221, ENLIGHTENMENT = 244, IMMANENCE = 317}
+local JA = {TABULA_RASA = 210, DARK_ARTS = 212, EBULLIENCE = 221, IMMANENCE = 317}
 local SPELL = {AERO = 154, STONE = 159, GEOHELIX = 278, ANEMOHELIX = 280, NOCTOHELIX = 284, KAUSTRA = 502}
 local BUFF = {DARK_ARTS = 359, ADDENDUM_BLACK = 402, TABULA_RASA = 377}
-local RECAST = {TABULA_RASA = 0, ENLIGHTENMENT = 235}   -- ability recast IDs
+local RECAST = {TABULA_RASA = 0}   -- ability recast IDs
 
 local CAST_BEGIN, CAST_INTERRUPT = 24931, 28787         -- param of category 8
 -- Message IDs for "Magic Burst!" (every message in res/action_messages.lua that contains "Magic Burst").
@@ -137,9 +150,7 @@ local function build_steps()
         table.insert(steps, {kind = "ja", id = JA.IMMANENCE, target = "<me>"})
         table.insert(steps, {kind = "ma", id = c[1], target = "<t>", expect_sc = c[2], chain_no = i})
     end
-    -- Enlightenment and Ebullience raise the power. They can fail because of lag, so if either one ran
-    -- it goes on to Kaustra (boost). It does not retry them, to make the burst window
-    table.insert(steps, {kind = "ja", id = JA.ENLIGHTENMENT, target = "<me>", boost = true})
+    -- Ebullience raises the power (boost). It is not retried, to make the burst window
     table.insert(steps, {kind = "ja", id = JA.EBULLIENCE, target = "<me>", boost = true})
     table.insert(steps, {kind = "ma", id = SPELL.KAUSTRA, target = "<t>", final = true})
     return steps
@@ -174,9 +185,6 @@ local function precheck()
         if r > 0 then table.insert(problems, string.format("%s is on recast (%.0f s left)", spell_name(id), r)) end
     end
     local ja_recasts = windower.ffxi.get_ability_recasts() or {}
-    if (ja_recasts[RECAST.ENLIGHTENMENT] or 0) > 0 then
-        table.insert(problems, string.format("Enlightenment is on recast (%d s left)", ja_recasts[RECAST.ENLIGHTENMENT]))
-    end
     if not has_buff(player, BUFF.TABULA_RASA) then
         if not settings.use_tabula_rasa then
             table.insert(problems, "Tabula Rasa is not active (Kaustra can only be cast while Tabula Rasa is active)")
@@ -233,8 +241,8 @@ local function send_step(now)
         return
     end
 
-    if step.final and not (run.boosted[JA.ENLIGHTENMENT] or run.boosted[JA.EBULLIENCE]) then
-        stop("Neither Enlightenment nor Ebullience went off")
+    if step.final and not run.boosted[JA.EBULLIENCE] then
+        stop("Ebullience did not go off")
         return
     end
 
@@ -251,8 +259,7 @@ local function send_step(now)
     else
         send_input(string.format('/ja "%s" %s', ja_name(step.id), step.target))
         run.phase = "ja_sent"
-        -- Keep the wait short for Enlightenment and Ebullience: even if both fail, Kaustra must land within 10 s of
-        -- the Gravitation landing (with 2.5 s it takes about 10.7 s and misses the burst window)
+        -- Keep the wait short for Ebullience: if it does not go off, stop at once (no time is left in the burst window to retry)
         run.deadline = now + (step.boost and settings.boost_timeout_sec or settings.ja_timeout_sec)
         run.tries = (run.tries or 0) + 1
     end
@@ -270,14 +277,8 @@ local function tick(now)
         if run.phase == "ja_sent" then
             local step = run.steps[run.index]
             if step.boost then
-                -- A power-up ability goes on even if it fails (if both fail, it stops before Kaustra)
-                chat(ja_name(step.id) .. " did not go off (continuing)", 167)
-                run.tries = 0
-                -- If the next one is also a power-up (Enlightenment -> Ebullience), use it without waiting: to leave room in the burst window.
-                -- Even if Enlightenment is delayed by lag and Ebullience fails, Enlightenment is counted and it can go on.
-                -- If the next one is Kaustra, wait 1 s (so a delayed Ebullience does not collide with it and bounce the cast)
-                local next_step = run.steps[run.index + 1]
-                advance(now, (next_step and next_step.boost) and 0 or settings.ja_gap_sec)
+                -- Ebullience is not retried (no time left in the burst window): stop before Kaustra
+                stop(ja_name(step.id) .. " did not go off")
             elseif run.tries <= settings.ja_retries then
                 send_step(now)   -- if it failed (e.g. waited too little), use it once more
             else
@@ -340,8 +341,8 @@ local function on_action(act)
     if not step then return end
 
     if act.category == 6 then
-        -- Enlightenment and Ebullience count as used even if they arrive late because of lag
-        if act.param == JA.ENLIGHTENMENT or act.param == JA.EBULLIENCE then
+        -- Ebullience counts as used even if it arrives late because of lag
+        if act.param == JA.EBULLIENCE then
             run.boosted[act.param] = true
         end
         -- An ability was executed
@@ -366,16 +367,16 @@ local function on_action(act)
         if step.final then
             local late = run.mb_deadline and now > run.mb_deadline
             local used = {}
-            if run.boosted[JA.ENLIGHTENMENT] then table.insert(used, "Enlightenment") end
             if run.boosted[JA.EBULLIENCE] then table.insert(used, "Ebullience") end
             local boosts = table.concat(used, " + ")
             -- seconds from the Noctohelix (Gravitation) landing to the Kaustra landing
             local since_sc = run.sc_landed_at and string.format("%.2f s", now - run.sc_landed_at) or "?"
+            local window = string.format("window %.1f s", mb_window_sec(run.chain_count))
             if is_magic_burst(act) then
-                finish(string.format("Kaustra magic burst! (%d-step chain / %s / %s after Gravitation / %s)", run.chain_count, boosts, since_sc, run.target_name))
+                finish(string.format("Kaustra magic burst! (%d-step chain / %s / %s after Gravitation / %s / %s)", run.chain_count, boosts, since_sc, window, run.target_name))
             else
                 finish((late and "Kaustra landed too late for the burst window (no burst)" or "Kaustra landed but it was not a magic burst")
-                    .. string.format(" (%s / %s after Gravitation / messages %s / %s)", boosts, since_sc, messages_of(act), run.target_name))
+                    .. string.format(" (%s / %s after Gravitation / %s / messages %s / %s)", boosts, since_sc, window, messages_of(act), run.target_name))
             end
             return
         end
@@ -388,8 +389,11 @@ local function on_action(act)
             run.chain_count = step.chain_no
             chat(string.format("Step %d: %s", step.chain_no, sc))
             if sc == "Gravitation" then
+                -- The final skillchain: wait post_final_sec for the post-cast lock to end, then Ebullience
                 run.sc_landed_at = now
-                run.mb_deadline = now + settings.mb_window_sec
+                run.mb_deadline = now + mb_window_sec(run.chain_count)
+                advance(now, settings.post_final_sec)
+                return
             end
         end
         advance(now, settings.post_land_sec)
@@ -429,7 +433,7 @@ local function start()
         target_name = target.name or "?",   -- shown in the result, so you can tell later which mob burst or not
         chain_count = 0,
         tries = 0,
-        boosted = {},   -- [Enlightenment / Ebullience ID] = it was used
+        boosted = {},   -- [Ebullience ID] = it was used
     }
     chat("Starting on " .. (target.name or "?"))
 end
@@ -445,7 +449,7 @@ windower.register_event("unload", function() run = nil end)
 -- Commands (//m6 or //melton6)
 -- -----------------------------------------------------------------------------
 local SETTABLE = {
-    post = "post_land_sec", gap = "ja_gap_sec", jatimeout = "ja_timeout_sec", boosttimeout = "boost_timeout_sec",
+    post = "post_land_sec", postfinal = "post_final_sec", gap = "ja_gap_sec", jatimeout = "ja_timeout_sec", boosttimeout = "boost_timeout_sec",
     retries = "ja_retries", casttimeout = "cast_start_timeout_sec", landtimeout = "land_timeout_sec",
 }
 
@@ -483,8 +487,8 @@ windower.register_event("addon command", function(cmd, ...)
         chat(string.format("%s = %s", key, tostring(settings[key])))
 
     elseif cmd == "status" then
-        chat(string.format("landing->next %.1f s / after ability %.1f s / ability check %.1f s x retries %d (Enlightenment/Ebullience %.1f s) / cast start check %.1f s / landing check %.1f s / auto Tabula Rasa %s",
-            settings.post_land_sec, settings.ja_gap_sec, settings.ja_timeout_sec, settings.ja_retries, settings.boost_timeout_sec,
+        chat(string.format("landing->next %.1f s (after Gravitation %.1f s) / after ability %.1f s / ability check %.1f s x retries %d (Ebullience %.1f s) / cast start check %.1f s / landing check %.1f s / auto Tabula Rasa %s",
+            settings.post_land_sec, settings.post_final_sec, settings.ja_gap_sec, settings.ja_timeout_sec, settings.ja_retries, settings.boost_timeout_sec,
             settings.cast_start_timeout_sec, settings.land_timeout_sec, settings.use_tabula_rasa and "ON" or "OFF"))
         if run then chat(string.format("Running: %d/%d", run.index, #run.steps)) end
 
@@ -494,7 +498,8 @@ windower.register_event("addon command", function(cmd, ...)
         chat("//m6 check   : only check whether it can start (executes nothing)")
         chat("//m6 status  : show the settings")
         chat("//m6 set post <sec> : from a spell landing to the next ability (default 3.0)")
-        chat("//m6 set gap <sec>  : wait after an ability (default 1.0; Enlightenment -> Ebullience needs 1 s)")
+        chat("//m6 set postfinal <sec> : from the final Gravitation landing to Ebullience (default 3.0; abilities are locked for a moment after a spell)")
+        chat("//m6 set gap <sec>  : wait after an ability (default 1.0)")
         chat("//m6 tabula  : whether to use Tabula Rasa automatically when it is off (ON/OFF)")
     end
 end)
